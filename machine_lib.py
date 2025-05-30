@@ -24,9 +24,11 @@ ops_set = basic_ops + ts_ops
 
 def login():
     
-    username = "zewen.huang@outlook.com"
-    password = "Hzw@1132461731"
- 
+    with open('../user_config.txt') as f:
+        data = f.readlines()
+        username = data[0].strip()
+        password = data[1].strip()
+
     # Create a session to persistently store the headers
     s = requests.Session()
  
