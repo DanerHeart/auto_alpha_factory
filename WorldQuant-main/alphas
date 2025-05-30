@@ -1,0 +1,1 @@
+group_rank(zscore(ts_mean((fnd6_acdo) / cap, 20)), subindustry)
