@@ -37,7 +37,7 @@ def login():
  
     # Send a POST request to the /authentication API
     response = s.post('https://api.worldquantbrain.com/authentication')
-    print(response.content)
+    # print(response.content)
     return s  
 
 
@@ -228,8 +228,6 @@ def single_simulate(alpha_pool, neut, region, universe, start):
                 sleep(600)
                 s = login()
 
-        print("task %d post done"%(x))
-
         for j, progress in enumerate(progress_urls):
             try:
                 while True:
@@ -242,23 +240,12 @@ def single_simulate(alpha_pool, neut, region, universe, start):
                 status = simulation_progress.json().get("status", 0)
                 if status != "COMPLETE" and status != "WARNING":
                     print("Not complete : %s"%(progress))
-
-                """
-                alpha_id = simulation_progress.json()["alpha"]
-
-                set_alpha_properties(s,
-                        alpha_id,
-                        name = "%s"%name,
-                        color = None,)
-                """
             except KeyError:
                 print("look into: %s"%progress)
             except Exception as e:
                 print(f"other error: {e}")
-
-        print("task %d simulate done"%(x))
     
-    print("Simulate done")
+    # print("Simulate done")
 
 
 def set_alpha_properties(
@@ -294,7 +281,6 @@ def get_alphas(start_date, end_date, sharpe_th, fitness_th, region, alpha_num, u
     # 3E large 3C less
     count = 0
     for i in range(0, alpha_num, 100):
-        print(i)
         url_e = "https://api.worldquantbrain.com/users/self/alphas?limit=100&offset=%d"%(i) \
                 + "&status=UNSUBMITTED%1FIS_FAIL&dateCreated%3E=2025-" + start_date  \
                 + "T00:00:00-04:00&dateCreated%3C2025-" + end_date \
@@ -323,6 +309,8 @@ def get_alphas(start_date, end_date, sharpe_th, fitness_th, region, alpha_num, u
                     turnover = alpha_list[j]["is"]["turnover"]
                     margin = alpha_list[j]["is"]["margin"]
                     longCount = alpha_list[j]["is"]["longCount"]
+                    returns = alpha_list[j]["is"]["returns"]
+                    drawdown = alpha_list[j]["is"]["drawdown"]
                     shortCount = alpha_list[j]["is"]["shortCount"]
                     decay = alpha_list[j]["settings"]["decay"]
                     exp = alpha_list[j]['regular']['code']
@@ -331,26 +319,12 @@ def get_alphas(start_date, end_date, sharpe_th, fitness_th, region, alpha_num, u
                     if (longCount + shortCount) > 100:
                         if sharpe < -sharpe_th:
                             exp = "-%s"%exp
-                        rec = [alpha_id, exp, sharpe, turnover, fitness, margin, dateCreated, decay]
-                        print(rec)
-                        if turnover > 0.7:
-                            rec.append(decay*4)
-                        elif turnover > 0.6:
-                            rec.append(decay*3+3)
-                        elif turnover > 0.5:
-                            rec.append(decay*3)
-                        elif turnover > 0.4:
-                            rec.append(decay*2)
-                        elif turnover > 0.35:
-                            rec.append(decay+4)
-                        elif turnover > 0.3:
-                            rec.append(decay+2)
+                        rec = [alpha_id, exp, sharpe, turnover, fitness, returns, drawdown,margin, dateCreated, decay]         
                         output.append(rec)
             except:
                 print("%d finished re-login"%i)
                 s = login()
 
-    print("count: %d"%count)
     return output
 
 def prune(next_alpha_recs, prefix, keep_num):
@@ -597,7 +571,7 @@ def multi_simulate(alpha_pools, neut, region, universe, start):
                 sleep(600)
                 s = login()
 
-        print("pool %d task %d post done"%(x,y))
+        # print("pool %d task %d post done"%(x,y))
 
         for j, progress in enumerate(progress_urls):
             try:
@@ -757,3 +731,54 @@ def login_hk():
         print("Logged in successfully.")
     
     return s 
+
+
+# 赋予alpha表达式一个初始decay
+def create_alpha_list(first_order):
+    init_decay = 6
+    fo_alpha_list = []
+    for alpha in first_order:
+        fo_alpha_list.append((alpha, init_decay))
+    return fo_alpha_list
+
+
+def convert_datafields_to_text(df_datafields):
+
+    #找出经过过滤和处理的数据字段
+    pc_fields = process_datafields(df_datafields)
+    
+    clean_fields = []
+    fields2pc = {}
+
+    for pf in pc_fields:
+        # feild是指数据字段，例如volume,colse,open等, pc_field是指经过过滤和处理的数据字段，例如ts_backfill(volume, 10)
+        # 建立字典，存储从数据字段到经过过滤和处理的数据字段的映射关系，例如{'volume': 'ts_backfill(volume, 10)'}
+        field = pf.split('ts_backfill(')[1].split(',')[0]
+        clean_fields.append(field)
+        fields2pc[field] = pf
+    text_parts = []
+    
+    for index, row in df_datafields.iterrows():
+        data_filed = row['id']
+        if data_filed not in clean_fields:
+            continue
+        description = row['description']
+        part = f"field: {data_filed}\n description: {description}\n field_enhanced: {fields2pc[data_filed]}\n"
+        text_parts.append(part)
+    return len(text_parts), ''.join(text_parts)
+
+def convert_operator_to_text(df_operators):
+    text_parts = []
+    for index, row in df_operators.iterrows():
+        operator = row['Operator']
+        description = row['Description']
+        example = row['Example']
+        part = f"操作符: {operator}\n描述: {description}\n例子: {example}\n{'='*30}\n"
+        text_parts.append(part)
+    return ''.join(text_parts)
+
+def get_deepseek_api():
+    with open("../user_config.txt", "r") as f:
+        my_api_key = f.readlines()[-1].strip()
+    return my_api_key
+
